@@ -1,0 +1,21 @@
+# Secrets / ambiente
+.env
+.env.*
+!.env.example
+.deploy-*.env
+
+# Sistema
+.DS_Store
+*.log
+Thumbs.db
+
+# Artefatos antigos / Node (não usados neste repo WP)
+node_modules/
+.next/
+.vercel/
+dist/
+out/
+*.tsbuildinfo
+next-build.*
+deploy-upload.zip
+*.zip

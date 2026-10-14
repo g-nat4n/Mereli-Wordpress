@@ -1,0 +1,73 @@
+services:
+  mysql:
+    image: mysql:8.4
+    container_name: mareli-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_USER: ${MYSQL_USER:-mareli}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?Defina MYSQL_PASSWORD no .env}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-mareli}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?Defina MYSQL_ROOT_PASSWORD no .env}
+    ports:
+      - "3308:3306"
+    volumes:
+      - mareli_mysql:/var/lib/mysql
+      - ./wordpress/docker/init-databases.sql:/docker-entrypoint-initdb.d/01-init-databases.sql:ro
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-p${MYSQL_ROOT_PASSWORD}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  wordpress:
+    image: wordpress:php8.2-apache
+    container_name: mareli-wordpress
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+    ports:
+      - "8081:80"
+    environment:
+      WORDPRESS_DB_HOST: mysql:3306
+      WORDPRESS_DB_USER: ${MYSQL_USER:-mareli}
+      WORDPRESS_DB_PASSWORD: ${MYSQL_PASSWORD}
+      WORDPRESS_DB_NAME: ${WORDPRESS_DB_NAME:-mareli_wp}
+      WORDPRESS_TABLE_PREFIX: wp_
+      WORDPRESS_CONFIG_EXTRA: |
+        define('WP_HOME', 'http://localhost:8081');
+        define('WP_SITEURL', 'http://localhost:8081');
+        define('FS_METHOD', 'direct');
+        define('WP_MEMORY_LIMIT', '256M');
+    volumes:
+      - wordpress_data:/var/www/html
+      - ./wordpress/wp-content/themes/mareli:/var/www/html/wp-content/themes/mareli
+      - ./wordpress/wp-content/plugins/mareli-core:/var/www/html/wp-content/plugins/mareli-core
+
+  wpcli:
+    image: wordpress:cli-php8.2
+    container_name: mareli-wpcli
+    depends_on:
+      - wordpress
+    environment:
+      WORDPRESS_DB_HOST: mysql:3306
+      WORDPRESS_DB_USER: ${MYSQL_USER:-mareli}
+      WORDPRESS_DB_PASSWORD: ${MYSQL_PASSWORD}
+      WORDPRESS_DB_NAME: ${WORDPRESS_DB_NAME:-mareli_wp}
+      WORDPRESS_TABLE_PREFIX: wp_
+      HOME: /tmp
+    volumes:
+      - wordpress_data:/var/www/html
+      - ./wordpress/wp-content/themes/mareli:/var/www/html/wp-content/themes/mareli
+      - ./wordpress/wp-content/plugins/mareli-core:/var/www/html/wp-content/plugins/mareli-core
+      - ./wordpress/bin:/scripts
+    user: "33:33"
+    entrypoint: wp
+    command: "--info"
+
+volumes:
+  mareli_mysql:
+  wordpress_data:
